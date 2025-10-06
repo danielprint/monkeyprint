@@ -1,0 +1,7 @@
+numpy>=1.21
+Pillow>=9.0
+scipy>=1.8
+pyserial>=3.5
+pyzmq>=22.3
+opencv-python>=4.5
+vtk>=9.2

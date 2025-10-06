@@ -20,7 +20,7 @@
 
 
 import os, time, math
-import threading, Queue
+import threading, queue
 import zmq
 
 
@@ -47,7 +47,7 @@ class communicationSocket:
 			self.socket.bind("tcp://"+str(ip)+":"+str(port))
 		else:
 			self.socket.connect("tcp://"+str(ip)+":"+str(port))
-		print "Connected to communication socket on tcp://"+str(ip)+":"+str(port) + "."
+		print("Connected to communication socket on tcp://"+str(ip)+":"+str(port) + ".")
 		# Get the sockets file descriptor for setting up a gtk IO watch.
 		self.fileDescriptor = self.socket.getsockopt(zmq.FD)
 		
@@ -57,13 +57,13 @@ class communicationSocket:
 		del self.socket
 		self.socket = self.context.socket(zmq.PAIR)
 		self.socket.connect("tcp://"+str(ip)+":"+str(port))
-		print "Connecting to communication socket on tcp://"+str(ip)+":"+str(port) + "."
+		print("Connecting to communication socket on tcp://"+str(ip)+":"+str(port) + ".")
 	
 	
 	# Send function.
 	def sendMulti(self, command, string):
 		self.socket.send_multipart([command, string])  
-		print "Sent " + command + ", " + string + "."
+		print("Sent " + command + ", " + string + ".")
 
 	
 
@@ -79,14 +79,14 @@ class communicationSocket:
 			# Extract message type and message data.
 			messageType, message = msg
 			
-			print "Received: " + messageType + ", " + message
+			print("Received: " + messageType + ", " + message)
 
 			# If message is status info...
 			if messageType == "command":
 				# ... forward to command status queue.
 				if self.queueCommands != None:
 					self.queueCommands.put(message)
-					print "Command " + message + " put into queue."
+					print("Command " + message + " put into queue.")
 			# If message is status info...
 			if messageType == "status":
 				# ... forward it to the status queue.
@@ -151,7 +151,7 @@ class fileSender(threading.Thread):
 		clientPath = "tcp://" + str(ip) + ":" + str(port)
 		if not self.queueStatusOut.qsize():
 			self.queueStatusOut.put("Connecting file transmission server to " + clientPath + ".")
-		print "Connecting file transmission server to " + clientPath + "."
+		print("Connecting file transmission server to " + clientPath + ".")
 		self.router.connect(clientPath)
 		
 		# Set up poll on socket events.
@@ -166,12 +166,12 @@ class fileSender(threading.Thread):
 	
 	def reset(self, ip, port):
 		clientPath = "tcp://" + str(ip) + ":" + str(port)
-		print "Listening on tcp://" + str(ip) + ":" + str(port)
+		print("Listening on tcp://" + str(ip) + ":" + str(port))
 		self.router.connect(clientPath)
 	
 	# This will run right after init function.
 	def run(self):
-		print "File transmission server running.\n"
+		print("File transmission server running.\n")
 		while not self.stopThread.isSet():
 			# Poll for receive events.
 			socketsWithEvents = dict(self.poller.poll(1))	# Timeout 1 ms.
@@ -187,7 +187,7 @@ class fileSender(threading.Thread):
 				#	print msg
 				except zmq.ZMQError as e:
 					if e.errno == zmq.ETERM:
-						print "finished..?"
+						print("finished..?")
 						#return   # shutting down, quit
 					else:
 						raise
@@ -197,22 +197,22 @@ class fileSender(threading.Thread):
 
 				# If this is the first message which states the file, open it.
 				if command[:8] == "filename":
-					print "Opening file."
+					print("Opening file.")
 					filename = command[9:]
 			#		print "Requested file ", filename, "."
 					# Open the file to transmit.
-					print filename
+					print(filename)
 					file = open(filename, "rb")
 
 					file.seek(0,2)
 					fileSize = str(file.tell())
 					self.router.send_multipart([identity, fileSize])
-					print "bar"
+					print("bar")
 	
 				elif command[:4] == "done":
 					file.close()
 					self.chunksSent = 0
-					print "Transmission complete. Idling..."
+					print("Transmission complete. Idling...")
 		
 				else:
 			#		print "Packet requested from ", offset_str
@@ -234,12 +234,12 @@ class fileSender(threading.Thread):
 						data = file.read(chunksz)		# Read specified number of bytes at offset.
 						# Send resulting chunk to client
 						self.router.send_multipart([identity, str(offset), data])
-						print "Sending packet ", str(self.chunksSent+1), " of ", filePackets, " from ", str(offset)
+						print("Sending packet ", str(self.chunksSent+1), " of ", filePackets, " from ", str(offset))
 						self.chunksSent += 1
 					# If transfer complete, reset everything and make ready again.
 					else:	# TODO: this is probably never used...
 						file.close()
-						print "Transmission complete. Idling..."
+						print("Transmission complete. Idling...")
 						#break
 						
 		
@@ -296,7 +296,7 @@ class fileReceiver(threading.Thread):
 	# This will run right after init function.
 	def run(self):
 		# Go straight into idle mode.
-		print "File transmission thread started.\n"
+		print("File transmission thread started.\n")
 		self.idle()
 	
 	# Check for input models in the queue.
@@ -318,8 +318,8 @@ class fileReceiver(threading.Thread):
 			command, filenames = self.queueFileTransferIn.get()
 			if command == "get" and not self.receiving:
 				filenameSource, filenameTarget = filenames.split(":")
-				print "Received filename " + filenameSource + "."
-				print "Saving to " + filenameTarget + "."
+				print("Received filename " + filenameSource + ".")
+				print("Saving to " + filenameTarget + ".")
 				self.receiving = True
 				self.receiveFile(filenameSource, filenameTarget)
 	
@@ -343,7 +343,7 @@ class fileReceiver(threading.Thread):
 	'''	
 
 	def receiveFile(self, filenameSource, filenameTarget):
-		print "Starting transmission."
+		print("Starting transmission.")
 		# Set the file transfer credit.
 		# At the start we have full credit.
 		credit = self.PIPELINE   # Up to PIPELINE chunks in transit.
@@ -376,7 +376,7 @@ class fileReceiver(threading.Thread):
 			# Blocking receive.
 			fileSize = self.dealer.recv()
 			fileSize = int(fileSize)
-			print "File size: ", fileSize, "bytes."
+			print("File size: ", fileSize, "bytes.")
 
 	
 			transmissionFinished = True
@@ -406,14 +406,14 @@ class fileReceiver(threading.Thread):
 					address, chunk = msg
 					address = int(address)
 					if address in requestList:
-						print "Received chunk ", str(chunks+1), " for address ", str(address)
+						print("Received chunk ", str(chunks+1), " for address ", str(address))
 						requestList = [x for x in requestList if x != address]
 					else:
-						print "Received non requested chunk. Dropping..."
+						print("Received non requested chunk. Dropping...")
 						chunk = None
 				except zmq.ZMQError as e:
 					if e.errno == zmq.ETERM:
-						print "Context was terminated."#	return   # shutting down, quit
+						print("Context was terminated.")#	return   # shutting down, quit
 					else:
 						raise
 
@@ -448,15 +448,15 @@ class fileReceiver(threading.Thread):
 						if command == "stop":
 							self.receiving = False
 							transmissionFinished == False
-							print "Transmission cancelled."
+							print("Transmission cancelled.")
 							break
 
 			file.close()
 			if transmissionFinished:
-				print "Transmission completed, %i bytes received." %total
+				print("Transmission completed, %i bytes received." %total)
 				self.queueFileTransferOut.put("success")
 			else:
-				print "Transmission cancelled."
+				print("Transmission cancelled.")
 				self.queueFileTransferOut.put("fail")
 			
 			time.sleep(1) # Give main thread a chance to empty queue.

@@ -216,7 +216,7 @@ class printerStandalone:
 			self.terminator = "\n"
 		
 		if not self.debug:
-			print "Opening serial on port " + self.port + " at " + str(self.baudrate) + " baud."
+			print("Opening serial on port " + self.port + " at " + str(self.baudrate) + " baud.")
 			# Configure and open serial.
 			try:
 				self.serial = serial.Serial(
@@ -231,11 +231,11 @@ class printerStandalone:
 			except serial.SerialException:
 				# ... define a dummy.
 				self.serial = None
-				print "Could not open serial on port " + str(self.port) + " with baud rate " + str(self.baudrate) + "."
+				print("Could not open serial on port " + str(self.port) + " with baud rate " + str(self.baudrate) + ".")
 			else:
 				self.flush()
 		else:
-			print "Serial in debug mode: not sending."
+			print("Serial in debug mode: not sending.")
 			self.serial = None
 
 	def flush(self, timeout=1.):
@@ -244,7 +244,7 @@ class printerStandalone:
 		string = "Flushing incoming messages."
 		while string != "":
 			string = self.serial.readline()
-			print string
+			print(string)
 		self.serial.timeout = oldTimeout
 		return string
 	
@@ -253,19 +253,19 @@ class printerStandalone:
 		self.serial.timeout = timeout
 		for i in range(20):
 			printerResponse = self.serial.readline()
-			print printerResponse
+			print(printerResponse)
 			if printerResponse.strip() == "ok":
 				break
 			elif printerResponse.strip().split(':')[-1] == "processing":
 				i = 0
-				print "Processing..."
+				print("Processing...")
 		self.serial.timeout = oldTimeout
 		return printerResponse
 	
 	
 	# Divide command in parts beginning with G or M.
 	def splitGCode(self, command):
-		return filter(None,re.split("([M][^MG]*|[G][^MG]*)",command))
+		return [_f for _f in re.split("([M][^MG]*|[G][^MG]*)",command) if _f]
 
 	def sendGCode(self,command):
 		commandList = self.splitGCode(command[0])
@@ -304,7 +304,7 @@ class printerStandalone:
 					# Separate string and value by space.
 					if value != None:
 						sendString = sendString + " " + str(value)
-					print "Sending: " + sendString + "."
+					print("Sending: " + sendString + ".")
 					# Send command.
 					self.serial.write(sendString+self.terminator)
 					# If retry flag is set...
@@ -312,7 +312,7 @@ class printerStandalone:
 					printerResponse = ""
 					if not self.settings['monkeyprintBoard'].value:
 						printerResponse = self.waitForOk()
-					print "Printer response: " + printerResponse
+					print("Printer response: " + printerResponse)
 					if retry:
 						# ... listen for ack until timeout.
 						printerResponse = printerResponse.strip()
@@ -619,7 +619,7 @@ class projector:
 				# ... define a dummy.
 				self.serial = None
 		else:
-			print "Projector serial in debug mode: not sending."
+			print("Projector serial in debug mode: not sending.")
 			self.serial = None
 		
 	

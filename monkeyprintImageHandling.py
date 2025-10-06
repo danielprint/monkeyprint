@@ -31,7 +31,7 @@ def array2image(a):
     elif a.typecode() == Numeric.Float32:
         mode = "F"
     else:
-        raise ValueError, "unsupported image mode"
+        raise ValueError("unsupported image mode")
     return Image.fromstring(mode, (a.shape[1], a.shape[0]), a.tostring())
 
 # Create a single channel, noisy image.
@@ -127,7 +127,7 @@ def imgManhattanDistance(img):
 	# Taken from http://blog.ostermiller.org/dilate-and-erode
 	# Find the nearest on pixel.
 	# Traverse from top left to bottom right.
-	print "manhattan start"
+	print("manhattan start")
 	for i in range(img.shape[0]):			#for (int i=0; i<image.length; i++){
 		for j in range(img.shape[1]):			#for (int j=0; j<image[i].length; j++){
 			# If the current pixel is on...
@@ -146,7 +146,7 @@ def imgManhattanDistance(img):
 				if j > 0:                # if (j>0) image[i][j] = Math.min(image[i][j], image[i][j-1]+1);
 					img[i,j] = min(img[i,j], img[i,j-1]+1)
 
-	print "manhattan 1"
+	print("manhattan 1")
 	# Traverse from bottom right to top left.
 	for i in range(img.shape[0]-1, -1, -1):
 		for j in range(img.shape[1]-1, -1, -1):
@@ -159,7 +159,7 @@ def imgManhattanDistance(img):
 			if j+1 < img.shape[1]:		#if (j+1<image[i].length) image[i][j] = Math.min(image[i][j], image[i][j+1]+1);
 				img[i,j] = min(img[i,j], img[i,j+1]+1)
 
-	print "manhattan 2"
+	print("manhattan 2")
 	# Distances are set, return the distance map.
 	return img;
 
@@ -168,16 +168,16 @@ def imgManhattanDistance(img):
 def imgErodeSlow(img, radius=1):
 	# First, we need to binarise and invert the image to create the distance map.
 	distanceMap = imgManhattanDistance(imgBinarise(imgInvert(img)))
-	print "manhattan done"
+	print("manhattan done")
 	# Copy the input image.
 	eroded = numpy.zeros_like(img, dtype='uint8')
-	print "zeros"
+	print("zeros")
 	# Now, all pixels with distance above threshold will get a 0.
 	for i in range(eroded.shape[0]):
 		for j in range(eroded.shape[1]):
 			if distanceMap[i,j] > radius:
 				eroded[i,j] = 255
-	print "eroded"
+	print("eroded")
 	# Return the eroded image as 0..255.
 	return eroded
 

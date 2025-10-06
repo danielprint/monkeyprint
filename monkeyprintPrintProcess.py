@@ -18,7 +18,7 @@
 #	You have received a copy of the GNU General Public License
 #    along with monkeyprint.  If not, see <http://www.gnu.org/licenses/>.
 
-import threading, Queue
+import threading, queue
 import monkeyprintSerial
 import monkeyprintCommands
 import time
@@ -65,7 +65,7 @@ class printProcess(threading.Thread):
 
 		# Submit success message.
 		self.queueConsole.put("Print process initialised.")
-		print "Print process initialised."
+		print("Print process initialised.")
 
 
 
@@ -94,7 +94,7 @@ class printProcess(threading.Thread):
 
 
 		# Run pre-loop commands. *********************************************
-		print "Running pre-loop commands. ************************************"
+		print("Running pre-loop commands. ************************************")
 		while(True):
 			# Check if we are done with pre-loop commands.
 			if self.printProcessList[commandIndex][0] == "Start loop":
@@ -110,16 +110,16 @@ class printProcess(threading.Thread):
 
 
 		# Run loop commands for each slice. **********************************
-		print "Running loop commands. ****************************************"
+		print("Running loop commands. ****************************************")
 		# Loop through slices.
 		while self.slice < self.numberOfSlices and not self.stopThread.isSet():
-			print "Printing slice " + str(self.slice) + " of " + str(self.numberOfSlices) + ". *********"
+			print("Printing slice " + str(self.slice) + " of " + str(self.numberOfSlices) + ". *********")
 			self.queueStatus.put("printing:nSlices:" + str(self.numberOfSlices))
 			self.queueStatus.put("printing:slice:" + str(self.slice))
 			# For each slice, loop through loop commands.
 			while(True):
 				if self.printProcessList[commandIndex][0] == "End loop":
-					print "End loop found."
+					print("End loop found.")
 					# If number of slices is reached or stop flag was set...
 					if self.slice == self.numberOfSlices - 1 or self.stopThread.isSet():
 						#... set command index to first post loop command.
@@ -136,14 +136,14 @@ class printProcess(threading.Thread):
 
 
 		# Run post-loop commands. ********************************************
-		print "Running post-loop commands. ***********************************"
+		print("Running post-loop commands. ***********************************")
 		while(commandIndex < len(self.printProcessList)):
 			self.commandRun(self.printProcessList[commandIndex])
 			commandIndex += 1
 
 
 		# Shut down nicely. **************************************************
-		print "Print stopped after " + str(self.slice-1) + " slices."
+		print("Print stopped after " + str(self.slice-1) + " slices.")
 		self.queueStatus.put("stopped:slice:"+ str(self.slice-1))
 		# Wait a bit to give people a chance to read the last message.
 		time.sleep(3)
@@ -161,7 +161,7 @@ class printProcess(threading.Thread):
 			time.sleep(0.5)
 		# Run internal commands.
 		if command[3] == 'internal':
-			print "Internal command:    \"" + command[0] + "\""
+			print("Internal command:    \"" + command[0] + "\"")
 			# Run the respective command.
 			if command[0] == "Expose":
 				self.expose()
@@ -176,13 +176,13 @@ class printProcess(threading.Thread):
 		# Run gCode serial command.
 		elif command[3] == 'serialGCode':
 			commandString = self.stringEvaluator.parseCommand(command[1])
-			print "G-Code command:      \"" + command[0] + "\": "  + commandString
+			print("G-Code command:      \"" + command[0] + "\": "  + commandString)
 			self.serialPrinter.sendGCode([commandString, None, True,None])
 
 		# Run monkeyprint serial command.
 		elif command[3] == 'serialMonkeyprint':
 			commandString = command[2]
-			print "Monkeyprint command: \"" + command[0] + "\": "  + command[2]
+			print("Monkeyprint command: \"" + command[0] + "\": "  + command[2])
 			self.serialPrinter.send([commandString, None, True,None])
 
 
@@ -207,7 +207,7 @@ class printProcess(threading.Thread):
 		# Fire the camera trigger if after exposure triggering has been selected.
 		if not self.debug and self.settings['camTriggerAfterExposure'].value == True and self.settings['monkeyprintBoard'].value == True:
 				self.queueConsole.put("   Triggering camera.")
-				print "Triggering camera."
+				print("Triggering camera.")
 				self.serialPrinter.send(['triggerCam', None, False, None])
 
 
@@ -287,7 +287,7 @@ class printProcess(threading.Thread):
 				self.queueStatus.put("error:connectionFail:")
 				#self.queueStatus.put("Serial port " + self.settings['Port'].value + " not found. Aborting.")
 				self.queueConsole.put("Serial port " + self.settings['port'].value + " not found. Aborting.\nMake sure your board is plugged in and you have defined the correct serial port in the settings menu.")
-				print "Connection to printer not established. Aborting print process. Check your settings!"
+				print("Connection to printer not established. Aborting print process. Check your settings!")
 				self.stopThread.set()
 			elif not self.debug:
 				# Send ping to test connection.
@@ -295,7 +295,7 @@ class printProcess(threading.Thread):
 					if serialPrinter.send(["ping", None, True, None]) == True:
 						self.queueStatus.put("preparing:connectionSuccess:")
 						#self.queueStatus.put("Connection to printer established.")
-						print "Connection to printer established."
+						print("Connection to printer established.")
 			return serialPrinter
 #		else:
 #			return None

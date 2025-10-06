@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: latin-1 -*-
 #
 #	Copyright (c) 2015-2016 Paul Bomke
@@ -83,7 +83,7 @@ def main(argv):
 
 def runGui(filename=None, debug=False):
 
-	print "Starting Monkeyprint with GUI."
+	print("Starting Monkeyprint with GUI.")
 	# Create a debug console text buffer.
 	console = monkeyprintGuiHelper.consoleText()
 
@@ -98,7 +98,7 @@ def runGui(filename=None, debug=False):
 
 	# Set debug mode if specified.
 	if debug:
-		print "Debug mode active."
+		print("Debug mode active.")
 		programSettings['debug'].value = True
 	else:
 		programSettings['debug'].value = False
@@ -111,7 +111,7 @@ def runGui(filename=None, debug=False):
 	# Create splash screen for given interval.
 	# Get version string first.
 	versionString = "Monkeyprint version " + str(programSettings['versionMajor'].value) + "." + str(programSettings['versionMinor'].value) + "." + str(programSettings['revision'].value)
-	print versionString
+	print(versionString)
 	splash = monkeyprintGuiHelper.splashWindow(imageFile='./logo.png', duration=1, infoString = versionString)
 
 	# Create gui.
@@ -124,7 +124,7 @@ def runGui(filename=None, debug=False):
 
 def runNoGui(filename=None, debug=False):
 
-	print "Starting without Gui."
+	print("Starting without Gui.")
 	# Create settings dictionary object for machine and program settings.
 	programSettings = monkeyprintSettings.programSettings()
 
@@ -134,7 +134,7 @@ def runNoGui(filename=None, debug=False):
 	# Set debug mode if specified.
 	if debug==True:
 		programSettings['debug'].value = debug
-		print "Debug mode active."
+		print("Debug mode active.")
 	else:
 		programSettings['debug'].value = False
 
@@ -146,17 +146,17 @@ def runNoGui(filename=None, debug=False):
 
 	#TODO disable this...
 	modelCollection.jobSettings['exposureTime'].value = 0.1
-	print ("Exposure time: " + str(modelCollection.jobSettings['exposureTime'].value) + ".")
+	print(("Exposure time: " + str(modelCollection.jobSettings['exposureTime'].value) + "."))
 
 
 	# Load project file.
 	# TODO: test if file is mkp.
 	modelCollection.loadProject(filename)
-	print ("Project file: " + str(filename) + " loaded successfully.")
-	print "Found the following models:"
+	print(("Project file: " + str(filename) + " loaded successfully."))
+	print("Found the following models:")
 	for model in modelCollection:
 		if model != 'default':
-			print ("   " + model)
+			print(("   " + model))
 
 	# Start the slicer.
 	modelCollection.updateSliceStack()
@@ -170,13 +170,13 @@ def runNoGui(filename=None, debug=False):
 		sys.stdout.flush()
 
 	# Start print process when slicers are done.
-	print "\nSlicer done. Starting print process."
+	print("\nSlicer done. Starting print process.")
 
 	# Create the projector window.
 	gui = monkeyprintGui.noGui(programSettings, modelCollection)
 
 
-	print "Print process done. Thank you for using Monkeyprint."
+	print("Print process done. Thank you for using Monkeyprint.")
 
 
 def runServerNoGui(port="5553", debug=False):
@@ -184,16 +184,16 @@ def runServerNoGui(port="5553", debug=False):
 
 
 def usage():
-	print "\nCommand line option not recognized.\n"
-	print "Usage: monkeyprint.py <options>\n"
+	print("\nCommand line option not recognized.\n")
+	print("Usage: monkeyprint.py <options>\n")
 
-	print "<no option>:                     Start GUI."
-	print "-h:                              Show this help text."
-	print "-f or --file <filename.mkp>:     Start GUI and load project file."
-	print "-p or --print <filename.mkp>:    Start without GUI and run a print job."
-	print "-s or --server				Start a monkeyprint server that prints incoming files."
-	print "-d:                              Run in debug mode without stepper motion"
-	print "                                 and shutter servo. This will overwrite"
-	print "                                 the debug option in the settings menu."
+	print("<no option>:                     Start GUI.")
+	print("-h:                              Show this help text.")
+	print("-f or --file <filename.mkp>:     Start GUI and load project file.")
+	print("-p or --print <filename.mkp>:    Start without GUI and run a print job.")
+	print("-s or --server				Start a monkeyprint server that prints incoming files.")
+	print("-d:                              Run in debug mode without stepper motion")
+	print("                                 and shutter servo. This will overwrite")
+	print("                                 the debug option in the settings menu.")
 
 main(sys.argv[1:])

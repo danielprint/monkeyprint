@@ -139,7 +139,7 @@ class stringEvaluator:
 					result = str(eval(expressionContent))
 #					print "Result: " + result
 				except SyntaxError:
-					print "   Something went wrong while parsing G-Code variables. Replacing by \"0\""
+					print("   Something went wrong while parsing G-Code variables. Replacing by \"0\"")
 				#curlyBraceContentsEvaluated.append(result)
 
 				# Replace curly brace expression by result.
@@ -183,7 +183,7 @@ class stringEvaluator:
 			pass
 #			print "      Replacing by " + value + "."
 		else:
-			print "      Unknown G-Code variable found: \"" + variable + "\". Replacing by \"0\"."
+			print("      Unknown G-Code variable found: \"" + variable + "\". Replacing by \"0\".")
 
 		return value
 
