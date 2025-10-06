@@ -23,13 +23,36 @@ In order for *monkeyprint* to work you need a 3d DLP printer that can receive co
 
 ### Installation
 #### Dependencies
-*monkeyprint* is programmed in python and uses VTK and openCV for stl processing, slicing and slice image handling. It also needs some other stuff, all of which you can get using the following command:
-sudo apt-get install git-core libvtk5.8 libopencv-core2.4 python2.7 python-vtk python-gtkglext1 python-numpy python-opencv python-imaging python-scipy python-serial python-zmq avrdude
-Tested with python 2.7.3 and VTK 5.8.0. There may be issues with VTK version 6 because of API changes.
+*monkeyprint* is now fully compatible with Python 3 on Ubuntu 22.04. Install the system libraries that provide GTK 3, the GtkGLExt bindings and VTK by running:
+
+```
+sudo apt install \
+    python3 python3-venv python3-pip \
+    python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-gtkglext1 \
+    python3-opencv python3-numpy python3-scipy python3-pil \
+    python3-serial python3-zmq python3-vtk9 libgtkglext1
+```
+
+The Python portion of the stack can be installed into a virtual environment:
+
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+This ensures that the VTK, OpenCV, Pillow, SciPy, PySerial and PyZMQ versions bundled with Ubuntu 22.04 are used together with the GTK 3 introspection bindings.
 
 #### Installation
 Once the dependencies are installed, simply download *monkeyprint* using git:
+
+```
 git clone git://github.com/robotsinthesun/monkeyprint.git
+cd monkeyprint
+source .venv/bin/activate  # if you created a virtual environment
+./monkeyprint.py
+```
 
 #### Hardware
 *monkeyprint* currently only works with a custom board. If you want to build it, you can find the schematics and layout.

@@ -19,9 +19,9 @@
 #    along with monkeyprint.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import pygtk
-pygtk.require('2.0')
-import gtk
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
 import gtkGLExtVTKRenderWindowInteractor
 import vtk
 
@@ -29,10 +29,10 @@ import vtk
 import monkeyprintModelHandling
 
 
-class renderView(gtk.VBox):
+class renderView(Gtk.VBox):
 	def __init__(self, settings, console=None, backgroundColour = (0.329412, 0.34902, 0.427451)):
 		# Call base class initializer.
-		gtk.VBox.__init__(self)
+		Gtk.VBox.__init__(self)
 		
 		# Internalise objects.
 		self.settings = settings
@@ -83,24 +83,24 @@ class renderView(gtk.VBox):
 		
 		
 		# Create an options panel.
-		self.optionsBox = gtk.HBox()
+		self.optionsBox = Gtk.HBox()
 		self.pack_start(self.optionsBox, expand=False, fill=False)
 		self.optionsBox.show()
 
 		# Make reset button.
-		self.buttonReset = gtk.Button(label="Reset view")
+		self.buttonReset = Gtk.Button(label="Reset view")
 		self.buttonReset.connect("clicked", self.callbackResetButton)
 		self.optionsBox.pack_start(self.buttonReset, expand=False, fill=False)
 		self.buttonReset.show()
 		
 		# Make colour checkbox.
-		self.checkButtonColour = gtk.CheckButton(label="Show colours (coming soon)")
+		self.checkButtonColour = Gtk.CheckButton(label="Show colours (coming soon)")
 		self.checkButtonColour.connect("toggled", self.callbackCheckButtonColour)
 		self.optionsBox.pack_start(self.checkButtonColour)
 		self.checkButtonColour.show()
 		
 		# Make axes checkbox.
-		self.checkButtonAxes = gtk.CheckButton(label="Show axes")
+		self.checkButtonAxes = Gtk.CheckButton(label="Show axes")
 		self.checkButtonAxes.connect("toggled", self.callbackCheckButtonAxes)
 		self.optionsBox.pack_start(self.checkButtonAxes)
 		self.checkButtonAxes.set_active(True)

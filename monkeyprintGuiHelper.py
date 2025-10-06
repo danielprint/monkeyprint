@@ -18,9 +18,10 @@
 #	You have received a copy of the GNU General Public License
 #    along with monkeyprint.  If not, see <http://www.gnu.org/licenses/>.
 
-import pygtk
-pygtk.require('2.0')
-import gtk, gobject
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('GdkPixbuf', '2.0')
+from gi.repository import Gtk, Gdk, GObject, GLib, GdkPixbuf, Pango
 import cairo
 from math import pi
 
@@ -34,7 +35,45 @@ from PIL import Image
 import inspect	# Provides methdos to check arguments of a function.
 import monkeyprintImageHandling as imageHandling
 import monkeyprintPrintProcess
-import Queue, threading, subprocess
+import queue, threading, subprocess
+
+
+def _pixbuf_from_file(path):
+        """Load a :class:`GdkPixbuf.Pixbuf` from ``path``.
+
+        The helper exists so we can swap out the underlying loading mechanism
+        more easily if GTK changes again in the future.
+        """
+
+        return GdkPixbuf.Pixbuf.new_from_file(path)
+
+
+def _pixbuf_from_array(array):
+        """Create a :class:`GdkPixbuf.Pixbuf` from a numpy array.
+
+        PyGTK provided :func:`pixbuf_new_from_array` which disappeared in the
+        introspection bindings used on Ubuntu 22.04.  We keep the pixels alive
+        by attaching the underlying :class:`GLib.Bytes` object to the pixbuf to
+        avoid premature garbage collection.
+        """
+
+        if array.ndim == 2:
+                array = numpy.repeat(array[:, :, None], 3, axis=2)
+        height, width, channels = array.shape
+        rowstride = width * channels
+        data = GLib.Bytes(array.astype(numpy.uint8).tobytes())
+        pixbuf = GdkPixbuf.Pixbuf.new_from_bytes(
+                data,
+                GdkPixbuf.Colorspace.RGB,
+                False,
+                8,
+                width,
+                height,
+                rowstride,
+        )
+        # Keep a reference so GC does not release the underlying buffer.
+        pixbuf._monkeyprint_bytes = data
+        return pixbuf
 
 
 
@@ -45,48 +84,48 @@ class splashWindow:
 
 
 		# Create pixbuf from file.
-		self.pixbuf = gtk.gdk.pixbuf_new_from_file(imageFile)
+		self.pixbuf = _pixbuf_from_file(imageFile)
 		self.size = (self.pixbuf.get_width(), self.pixbuf.get_height())
 
 		# Create window.
-		self.splashWindow = gtk.Window()
+		self.splashWindow = Gtk.Window()
 		self.splashWindow.set_decorated(False)
 		self.splashWindow.resize(self.size[0], self.size[1])
 		self.splashWindow.show()
-		self.splashWindow.set_position(gtk.WIN_POS_CENTER_ALWAYS)
+		self.splashWindow.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
 
 		# Create a horizontal and a vertical box.
-		self.splashBoxH = gtk.HBox()
+		self.splashBoxH = Gtk.HBox()
 		self.splashWindow.add(self.splashBoxH)
 		self.splashBoxH.show()
 
-		self.splashBox = gtk.VBox()
+		self.splashBox = Gtk.VBox()
 		self.splashBoxH.pack_start(self.splashBox, fill=True, expand=True, padding=5)
 		self.splashBox.show()
 
 		# Create image container and set pixbuf.
-		self.splashImage = gtk.Image()
+		self.splashImage = Gtk.Image()
 		self.splashImage.set_from_pixbuf(self.pixbuf)
 		self.splashBox.pack_start(self.splashImage, expand=True, fill=True, padding=5)
 		self.splashImage.show()
 
 		# Create info string label.
 		if infoString != None:
-			self.info = gtk.Label(infoString)
+			self.info = Gtk.Label(infoString)
 			self.splashBox.pack_start(self.info, expand=True, fill=True, padding=5)
 			self.info.show()
-			self.info.set_justify(gtk.JUSTIFY_LEFT)
+			self.info.set_justify(Gtk.Justification.LEFT)
 
 		# Register a gtk timeout function that terminates the splash screen.
-		splashWindowTimer = gobject.timeout_add(duration*1000, self.destroy)
+		splashWindowTimer = GLib.timeout_add(duration*1000, self.destroy)
 
 		# Start gtk main loop.
-		gtk.main()
+		Gtk.main()
 
 
 	# Timeout callback to terminate the splash screen.
 	def destroy(self):
-		gtk.mainquit()
+		Gtk.main_quit()
 		self.splashWindow.destroy()
 
 
@@ -99,12 +138,12 @@ class splashWindow:
 # checking for this property during the tab switch.
 # It also allows one custom function per page that runs
 # when the page is switched to.
-class notebook(gtk.Notebook):
+class notebook(Gtk.Notebook):
 
 	# Override init function.
 	def __init__(self, customFunctions=None):
 		# Call superclass init function. Nothing special here...
-		gtk.Notebook.__init__(self)
+		Gtk.Notebook.__init__(self)
 		# Create custom function list to add to.
 		self.customFunctions = [None]
 		# Connect the page switch signal to a custom event handler.
@@ -168,10 +207,10 @@ class notebook(gtk.Notebook):
 
 
 # Pix buf for calibration image display.
-class imageFromFile(gtk.VBox):
+class imageFromFile(Gtk.VBox):
 	def __init__(self, programSettings, width = 100, customFunctions=[]):
 		# Init super class.
-		gtk.VBox.__init__(self)
+		Gtk.VBox.__init__(self)
 
 		# Internalise data.
 		self.programSettings = programSettings
@@ -183,22 +222,22 @@ class imageFromFile(gtk.VBox):
 		self.height = int(width * aspect)
 
 		# Create image view.
-		self.imageView = gtk.Image()
-		self.imgSpacingBox = gtk.HBox();
+		self.imageView = Gtk.Image()
+		self.imgSpacingBox = Gtk.HBox();
 		self.imgSpacingBox.pack_start(self.imageView, expand=True, fill=True, padding=5)
 		self.imgSpacingBox.show()
 		self.pack_start(self.imgSpacingBox, expand=True, fill=True, padding=5)
 		self.imageView.show()
 
 		# Load and delete button.
-		self.buttonBox = gtk.HBox()
+		self.buttonBox = Gtk.HBox()
 		self.pack_start(self.buttonBox, expand=True, fill=True, padding=5)
 		self.buttonBox.show()
-		self.buttonLoad = gtk.Button(label='Load')
+		self.buttonLoad = Gtk.Button(label='Load')
 		self.buttonBox.pack_start(self.buttonLoad, expand=True, fill=True, padding=5)
 		self.buttonLoad.connect("clicked", self.callbackLoad)
 		self.buttonLoad.show()
-		self.buttonRemove = gtk.Button(label='Remove')
+		self.buttonRemove = Gtk.Button(label='Remove')
 		self.buttonBox.pack_start(self.buttonRemove, expand=True, fill=True, padding=5)
 		self.buttonRemove.connect("clicked", self.callbackRemove)
 		self.buttonRemove.set_sensitive(self.programSettings['calibrationImage'].value)
@@ -214,14 +253,14 @@ class imageFromFile(gtk.VBox):
 			# Load image from file.
 			if (os.path.isfile('./calibrationImage.jpg')):
 				# Write image to pixbuf.
-				self.pixbuf = gtk.gdk.pixbuf_new_from_file('./calibrationImage.jpg')
+				self.pixbuf = _pixbuf_from_file('./calibrationImage.jpg')
 				# Resize the image.
-				self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, gtk.gdk.INTERP_BILINEAR)
+				self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, GdkPixbuf.InterpType.BILINEAR)
 			elif (os.path.isfile('./calibrationImage.png')):
 				# Write image to pixbuf.
-				self.pixbuf = gtk.gdk.pixbuf_new_from_file('./calibrationImage.png')
+				self.pixbuf = _pixbuf_from_file('./calibrationImage.png')
 				# Resize the image.
-				self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, gtk.gdk.INTERP_BILINEAR)
+				self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, GdkPixbuf.InterpType.BILINEAR)
 			else:
 				self.programSettings['calibrationImage'].value = False
 
@@ -230,7 +269,7 @@ class imageFromFile(gtk.VBox):
 			# Create white dummy image.
 			self.imageWhite = numpy.ones((self.height, self.width, 3), numpy.uint8) * 255
 			# Create pixbuf from dummy image.
-			self.pixbuf = gtk.gdk.pixbuf_new_from_array(self.imageWhite, gtk.gdk.COLORSPACE_RGB, 8)
+			self.pixbuf = _pixbuf_from_array(self.imageWhite)
 
 		# Set image to viewer.
 		self.imageView.set_from_pixbuf(self.pixbuf)
@@ -239,12 +278,12 @@ class imageFromFile(gtk.VBox):
 		# Open file chooser dialog."
 		filepath = ""
 		# File open dialog to retrive file name and file path.
-		dialog = gtk.FileChooserDialog("Load calibration image", None, gtk.FILE_CHOOSER_ACTION_OPEN, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+		dialog = Gtk.FileChooserDialog("Load calibration image", None, Gtk.FileChooserAction.OPEN, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
 		dialog.set_modal(True)
-		dialog.set_default_response(gtk.RESPONSE_OK)
+		dialog.set_default_response(Gtk.ResponseType.OK)
 		dialog.set_current_folder(self.programSettings['currentFolder'].value)
 		# File filter for the dialog.
-		fileFilter = gtk.FileFilter()
+		fileFilter = Gtk.FileFilter()
 		fileFilter.set_name("Image file")
 		fileFilter.add_pattern("*.jpg")
 		fileFilter.add_pattern("*.png")
@@ -254,7 +293,7 @@ class imageFromFile(gtk.VBox):
 		response = dialog.run()
 		# Check the response.
 		# If OK was pressed...
-		if response == gtk.RESPONSE_OK:
+		if response == Gtk.ResponseType.OK:
 			filepath = dialog.get_filename()
 			filename = filepath.split('/')[-1]
 			fileExtension = filepath.lower()[-4:]
@@ -264,7 +303,7 @@ class imageFromFile(gtk.VBox):
 				try:
 					shutil.copy(filepath, './calibrationImage' + fileExtension)
 				except shutil.Error:
-					print "File copy error, maybe you have chosen the calibration image?"
+					print("File copy error, maybe you have chosen the calibration image?")
 				# Set button sensitivities.
 				self.buttonRemove.set_sensitive(True)
 				self.programSettings['calibrationImage'].value = True
@@ -277,7 +316,7 @@ class imageFromFile(gtk.VBox):
 			# Close dialog.
 			dialog.destroy()
 		# If cancel was pressed...
-		elif response == gtk.RESPONSE_CANCEL:
+		elif response == Gtk.ResponseType.CANCEL:
 			#... do nothing.
 			dialog.destroy()
 
@@ -316,10 +355,10 @@ class imageFromFile(gtk.VBox):
 
 
 # Slider that takes image which has to be updated externally.
-class imageSlider(gtk.VBox):
+class imageSlider(Gtk.VBox):
 	def __init__(self, modelCollection, programSettings, width=250, console=None, customFunctions=None):
 		# Call super class init function.
-		gtk.VBox.__init__(self)
+		Gtk.VBox.__init__(self)
 
 		# Internalise parameters.
 		self.modelCollection = modelCollection
@@ -336,18 +375,18 @@ class imageSlider(gtk.VBox):
 
 
 		# Create image view.
-		self.imageView = gtk.Image()
+		self.imageView = Gtk.Image()
 		# Create black dummy image.
 		self.imageBlack = numpy.zeros((self.height, self.width, 3), numpy.uint8)
 		# Create pixbuf from numpy.
-		self.pixbuf = gtk.gdk.pixbuf_new_from_array(self.imageBlack, gtk.gdk.COLORSPACE_RGB, 8)
+		self.pixbuf = _pixbuf_from_array(self.imageBlack)
 		# Set image to viewer.
 		self.imageView.set_from_pixbuf(self.pixbuf)
 		self.pack_start(self.imageView, expand=True, fill=True)
 		self.imageView.show()
 
 		# Create slider.
-		self.slider = gtk.HScrollbar()
+		self.slider = Gtk.HScrollbar()
 		self.pack_start(self.slider, expand=True, fill=True)
 		self.slider.set_range(1,100)
 		self.slider.set_value(1)
@@ -358,17 +397,17 @@ class imageSlider(gtk.VBox):
 #		self.slider.connect("button-release-event", self.callbackScroll)
 
 		# Create current slice label.
-		self.labelBox = gtk.HBox()
+		self.labelBox = Gtk.HBox()
 		self.pack_start(self.labelBox, expand=True, fill=True)
 		self.labelBox.show()
 		# Create labels.
-		self.minLabel = gtk.Label('1')
+		self.minLabel = Gtk.Label('1')
 		self.labelBox.pack_start(self.minLabel, expand=False)
 		self.minLabel.show()
-		self.currentLabel = gtk.Label('1')
+		self.currentLabel = Gtk.Label('1')
 		self.labelBox.pack_start(self.currentLabel, expand=True, fill=True)
 		self.currentLabel.show()
-		self.maxLabel = gtk.Label('1')
+		self.maxLabel = Gtk.Label('1')
 		self.labelBox.pack_start(self.maxLabel, expand=False)
 		self.maxLabel.show()
 
@@ -384,10 +423,10 @@ class imageSlider(gtk.VBox):
 			img = self.imageBlack
 
 		# Write image to pixbuf.
-		self.pixbuf = gtk.gdk.pixbuf_new_from_array(img, gtk.gdk.COLORSPACE_RGB, 8)
+		self.pixbuf = _pixbuf_from_array(img)
 		# Resize the image.
 		if img.shape[1] != self.width:
-			self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, gtk.gdk.INTERP_BILINEAR)
+			self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, GdkPixbuf.InterpType.BILINEAR)
 		# Set image to viewer.
 		self.imageView.set_from_pixbuf(self.pixbuf)
 
@@ -413,10 +452,10 @@ class imageSlider(gtk.VBox):
 				self.currentLabel.set_text("Please wait.")
 				currentSliceNumber = 0
 			# Write image to pixbuf.
-			self.pixbuf = gtk.gdk.pixbuf_new_from_array(img, gtk.gdk.COLORSPACE_RGB, 8)
+			self.pixbuf = _pixbuf_from_array(img)
 			# Resize the pixbuf.
 			if img.shape[1] != self.width:
-				self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, gtk.gdk.INTERP_BILINEAR)#INTERP_NEAREST)
+				self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, GdkPixbuf.InterpType.BILINEAR)#INTERP_NEAREST)
 			# Set image to viewer.
 			self.imageView.set_from_pixbuf(self.pixbuf)
 
@@ -461,7 +500,7 @@ class imageSlider(gtk.VBox):
 # toggle button for a model specific setting. If no model collection has been
 # supplied, this is a general setting.
 
-class toggleButton(gtk.CheckButton):
+class toggleButton(Gtk.CheckButton):
 	# Override init function.
 	def __init__(self, string, settings=None, modelCollection=None, customFunctions=None, displayString=None):
 
@@ -489,7 +528,7 @@ class toggleButton(gtk.CheckButton):
 
 		# Create toggle button.
 		# Call super class init funtion.
-		gtk.CheckButton.__init__(self, self.labelString)
+		Gtk.CheckButton.__init__(self, self.labelString)
 		self.show()
 		# Set toggle state according to setting.
 		self.set_active(self.settings[string].value)
@@ -528,12 +567,12 @@ class toggleButton(gtk.CheckButton):
 # Will call a function passed to it on input. Label, default value and
 # callback function are taken from the settings object.
 
-class entry(gtk.HBox):
+class entry(Gtk.HBox):
 	# Override init function.
 #	def __init__(self, string, settings, function=None):
 	def __init__(self, string, settings=None, modelCollection=None, customFunctions=None, width=None, displayString=None):
 		# Call super class init function.
-		gtk.HBox.__init__(self)
+		Gtk.HBox.__init__(self)
 		self.show()
 
 		self.string = string
@@ -560,18 +599,18 @@ class entry(gtk.HBox):
 
 
 		# Make label.
-		self.label = gtk.Label(self.labelString)
+		self.label = Gtk.Label(self.labelString)
 	#	if displayString != None:
-	#		self.label = gtk.Label(displayString+self.settings[string].unit)
+	#		self.label = Gtk.Label(displayString+self.settings[string].unit)
 	#	else:
-	#		self.label = gtk.Label(string+self.settings[string].unit)
+	#		self.label = Gtk.Label(string+self.settings[string].unit)
 		self.label.set_alignment(xalign=0, yalign=0.5)
 		self.pack_start(self.label, expand=True, fill=True, padding=5)
 		self.label.show()
 
 
 		# Make text entry.
-		self.entry = gtk.Entry()
+		self.entry = Gtk.Entry()
 		self.pack_start(self.entry, expand=False, fill=False, padding=5)
 		self.entry.show()
 		if width == None:
@@ -600,15 +639,15 @@ class entry(gtk.HBox):
 		# Note: Tab will first emit a key press event, then a focus out event.
 #		if event.type.value_name == "GDK_FOCUS_CHANGE" and self.entry.has_focus()==False:
 #			print 'foo'
-#		elif event.type.value_name == "GDK_KEY_PRESS" and event.keyval == gtk.keysyms.Return:
+#		elif event.type.value_name == "GDK_KEY_PRESS" and event.keyval == Gtk.keysyms.Return:
 #			print 'bar'
 		# GDK_FOCUS_CHANGE is emitted on focus in or out, so make sure the focus is gone.
 		# If Tab key was pressed, set tabKeyPressed and leave.
-		if event.type.value_name == "GDK_KEY_PRESS" and event.keyval == gtk.keysyms.Tab:
+		if event.type.value_name == "GDK_KEY_PRESS" and event.keyval == Gtk.keysyms.Tab:
 			self.tabKeyPressed = True
 			return
 		# If focus was lost and tab key was pressed or if return key was pressed, set the value.
-		if (event.type.value_name == "GDK_FOCUS_CHANGE" and self.entry.has_focus()==False and self.tabKeyPressed) or (event.type.value_name == "GDK_KEY_PRESS" and (event.keyval == gtk.keysyms.Return or event.keyval == gtk.keysyms.KP_Enter)):
+		if (event.type.value_name == "GDK_FOCUS_CHANGE" and self.entry.has_focus()==False and self.tabKeyPressed) or (event.type.value_name == "GDK_KEY_PRESS" and (event.keyval == Gtk.keysyms.Return or event.keyval == Gtk.keysyms.KP_Enter)):
 			# Set value.
 			# In case a model collection was provided...
 			if self.modelCollection != None:
@@ -657,10 +696,10 @@ class entry(gtk.HBox):
 
 '''
 # Slider that takes image stack.
-class imageSlider2(gtk.VBox):
+class imageSlider2(Gtk.VBox):
 	def __init__(self, imageStack, programSettings, console=None, customFunctions=None):
 		# Call super class init function.
-		gtk.VBox.__init__(self)
+		Gtk.VBox.__init__(self)
 
 		# Internalise parameters.
 		self.imageStack = imageStack
@@ -676,21 +715,21 @@ class imageSlider2(gtk.VBox):
 
 
 		# Create image view.
-		self.imageView = gtk.Image()
+		self.imageView = Gtk.Image()
 		# Create random noise image.
 		self.imageRandom = numpy.random.rand(self.height, self.width, 3) * 255
 		self.imageRandom = numpy.uint8(self.imageRandom)
 		# Create black dummy image.
 		self.imageBlack = numpy.zeros((self.height, self.width, 3), numpy.uint8)
 		# Create pixbuf from numpy.
-		self.pixbuf = gtk.gdk.pixbuf_new_from_array(self.imageRandom, gtk.gdk.COLORSPACE_RGB, 8)
+		self.pixbuf = _pixbuf_from_array(self.imageRandom)
 		# Set image to viewer.
 		self.imageView.set_from_pixbuf(self.pixbuf)
 		self.pack_start(self.imageView, expand=True, fill=True)
 		self.imageView.show()
 
 		# Create slider.
-		self.slider = gtk.HScrollbar()
+		self.slider = Gtk.HScrollbar()
 		self.pack_start(self.slider, expand=True, fill=True)
 		self.slider.set_range(1,100)
 		self.slider.set_value(1)
@@ -701,17 +740,17 @@ class imageSlider2(gtk.VBox):
 #		self.slider.connect("button-release-event", self.callbackScroll)
 
 		# Create current slice label.
-		self.labelBox = gtk.HBox()
+		self.labelBox = Gtk.HBox()
 		self.pack_start(self.labelBox, expand=True, fill=True)
 		self.labelBox.show()
 		# Create labels.
-		self.minLabel = gtk.Label('1')
+		self.minLabel = Gtk.Label('1')
 		self.labelBox.pack_start(self.minLabel, expand=False)
 		self.minLabel.show()
-		self.currentLabel = gtk.Label('1')
+		self.currentLabel = Gtk.Label('1')
 		self.labelBox.pack_start(self.currentLabel, expand=True, fill=True)
 		self.currentLabel.show()
-		self.maxLabel = gtk.Label('1')
+		self.maxLabel = Gtk.Label('1')
 		self.labelBox.pack_start(self.maxLabel, expand=False)
 		self.maxLabel.show()
 
@@ -720,9 +759,9 @@ class imageSlider2(gtk.VBox):
 	def updateImage(self, position):
 		if position+1 == self.slider.get_value():
 			# Get the image from the slice buffer.
-			self.pixbuf = gtk.gdk.pixbuf_new_from_array(self.imageStack.getImage(self.slider.get_value()-1), gtk.gdk.COLORSPACE_RGB, 8)
+			self.pixbuf = _pixbuf_from_array(self.imageStack.getImage(self.slider.get_value()-1))
 			# Resize the image.
-			self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, gtk.gdk.INTERP_BILINEAR)#INTERP_NEAREST)
+			self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, GdkPixbuf.InterpType.BILINEAR)#INTERP_NEAREST)
 			# Set image to viewer.
 			self.imageView.set_from_pixbuf(self.pixbuf)
 
@@ -733,9 +772,9 @@ class imageSlider2(gtk.VBox):
 		# Get the image from the slice buffer and convert it to 3 channels.
 		img = imageHandling.convertSingle2RGB(self.imageStack.getImage(int(self.slider.get_value()-1)))
 		# Write image to pixbuf.
-		self.pixbuf = gtk.gdk.pixbuf_new_from_array(img, gtk.gdk.COLORSPACE_RGB, 8)
+		self.pixbuf = _pixbuf_from_array(img)
 		# Resize the pixbuf.
-		self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, gtk.gdk.INTERP_NEAREST)
+		self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, GdkPixbuf.InterpType.NEAREST)
 		# Set image to viewer.
 		self.imageView.set_from_pixbuf(self.pixbuf)
 		# Set current page label.
@@ -769,12 +808,12 @@ class imageSlider2(gtk.VBox):
 
 
 
-class printProgressBar(gtk.ProgressBar):
+class printProgressBar(Gtk.ProgressBar):
 	def __init__(self, sliceQueue=None):
-		gtk.ProgressBar.__init__(self)
+		Gtk.ProgressBar.__init__(self)
 		self.limit = 1.
 		self.sliceQueue = sliceQueue
-		self.queueStatus = Queue.Queue()
+		self.queueStatus = queue.Queue()
 
 	def setLimit(self, limit):
 		self.limit = float(limit)
@@ -808,10 +847,10 @@ class printProgressBar(gtk.ProgressBar):
 # separately. This way we can have multiple views that share
 # the same text buffer on different tabs...
 
-class consoleText(gtk.TextBuffer):
+class consoleText(Gtk.TextBuffer):
 	# Override init function.
 	def __init__(self, lineLenght = None):
-		gtk.TextBuffer.__init__(self)
+		Gtk.TextBuffer.__init__(self)
 	# Add text method with auto line break.
 	def addLine(self, string):
 		self.insert(self.get_end_iter(),"\n"+string)
@@ -825,30 +864,30 @@ class consoleText(gtk.TextBuffer):
 
 
 # Creates a text viewer window that automatically scrolls down on new entries.
-class consoleView(gtk.Frame):#ScrolledWindow):
+class consoleView(Gtk.Frame):#ScrolledWindow):
 	# Override init function.
 	def __init__(self, textBuffer):
-		gtk.Frame.__init__(self)
+		Gtk.Frame.__init__(self)
 		self.show()
 		# Create box for content.
-		self.box = gtk.VBox()
+		self.box = Gtk.VBox()
 		self.add(self.box)
 		self.box.show()
 
 		# Pack an empty label as the frame label.
 		# Otherwise corners are not round. Strange...
-		label = gtk.Label()
+		label = Gtk.Label()
 		self.set_label_widget(label)
 
 		# Create the scrolled window.
-		self.scrolledWindow = gtk.ScrolledWindow()
-		self.scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
+		self.scrolledWindow = Gtk.ScrolledWindow()
+		self.scrolledWindow.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
 		self.box.pack_start(self.scrolledWindow, expand=True, fill=True)
 		self.scrolledWindow.show()
 		# Text view.
-		self.textViewConsole = gtk.TextView(buffer=textBuffer)
+		self.textViewConsole = Gtk.TextView(buffer=textBuffer)
 		self.textViewConsole.set_editable(False)
-		self.textViewConsole.set_wrap_mode(gtk.WRAP_WORD)
+		self.textViewConsole.set_wrap_mode(Gtk.WrapMode.WORD)
 		self.scrolledWindow.add(self.textViewConsole)
 		self.textViewConsole.show()
 		# Get text buffer to write to.
@@ -912,9 +951,9 @@ class avrdudeThread(threading.Thread):
 
 
 
-class imageView(gtk.Image):
+class imageView(Gtk.Image):
 	def __init__(self, settings, modelCollection, width=None):
-		gtk.Image.__init__(self)
+		Gtk.Image.__init__(self)
 
 		# Internalise parameters.
 		self.settings = settings
@@ -938,7 +977,7 @@ class imageView(gtk.Image):
 		# Create black dummy image.
 		self.imageBlack = numpy.zeros((self.height, self.width, 3), numpy.uint8)
 		# Create pixbuf from numpy.
-		self.pixbuf = gtk.gdk.pixbuf_new_from_array(self.imageBlack, gtk.gdk.COLORSPACE_RGB, 8)
+		self.pixbuf = _pixbuf_from_array(self.imageBlack)
 		# Set image to viewer.
 		self.set_from_pixbuf(self.pixbuf)
 
@@ -949,21 +988,21 @@ class imageView(gtk.Image):
 			# Get the image from the slice buffer and convert it to 3 channels.
 			image = imageHandling.convertSingle2RGB(image)
 			# Write image to pixbuf.
-			self.pixbuf = gtk.gdk.pixbuf_new_from_array(image, gtk.gdk.COLORSPACE_RGB, 8)
+			self.pixbuf = _pixbuf_from_array(image)
 			# Resize the image if in debug mode.
 			#if self.settings['debug'].value:
 			if self.resizeFlag and image.shape[1] != self.settings['previewSliceWidth'].value:
-				self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, gtk.gdk.INTERP_BILINEAR)
+				self.pixbuf = self.pixbuf.scale_simple(self.width, self.height, GdkPixbuf.InterpType.BILINEAR)
 		else:
 			# Create pixbuf from numpy.
-			self.pixbuf = gtk.gdk.pixbuf_new_from_array(self.imageBlack, gtk.gdk.COLORSPACE_RGB, 8)
+			self.pixbuf = _pixbuf_from_array(self.imageBlack)
 		# Set pixbuf.
 		self.set_from_pixbuf(self.pixbuf)
 
 
-class projectorDisplay(gtk.Window):
+class projectorDisplay(Gtk.Window):
 	def __init__(self, settings, modelCollection):
-		gtk.Window.__init__(self)
+		Gtk.Window.__init__(self)
 
 		# Internalise parameters.
 		self.settings = settings
@@ -976,7 +1015,7 @@ class projectorDisplay(gtk.Window):
 
 		# Customise window.
 		# No decorations.
-		self.set_decorated(False)#gtk.FALSE)
+		self.set_decorated(False)#Gtk.FALSE)
 		# Call resize before showing the window.
 		if self.debug and not self.printOnPi:
 			aspect = float(self.settings['projectorSizeY'].value) / float(self.settings['projectorSizeX'].value)
@@ -1002,7 +1041,7 @@ class projectorDisplay(gtk.Window):
 		# Create black dummy image.
 		self.imageBlack = numpy.zeros((self.get_size()[1], self.get_size()[0], 3), numpy.uint8)
 		# Create pixbuf from numpy.
-		self.pixbuf = gtk.gdk.pixbuf_new_from_array(self.imageBlack, gtk.gdk.COLORSPACE_RGB, 8)
+		self.pixbuf = _pixbuf_from_array(self.imageBlack)
 		# Set image to viewer.
 		self.imageView.set_from_pixbuf(self.pixbuf)
 		self.add(self.imageView)
@@ -1017,13 +1056,13 @@ class projectorDisplay(gtk.Window):
 			# Get the image from the slice buffer and convert it to 3 channels.
 			image = imageHandling.convertSingle2RGB(image)
 			# Write image to pixbuf.
-			self.pixbuf = gtk.gdk.pixbuf_new_from_array(image, gtk.gdk.COLORSPACE_RGB, 8)
+			self.pixbuf = _pixbuf_from_array(image)
 			# Resize the image if in debug mode.
 			if self.debug:
-				self.pixbuf = self.pixbuf.scale_simple(self.get_size()[0], self.get_size()[1], gtk.gdk.INTERP_BILINEAR)
+				self.pixbuf = self.pixbuf.scale_simple(self.get_size()[0], self.get_size()[1], GdkPixbuf.InterpType.BILINEAR)
 		else:
 			# Create pixbuf from numpy.
-			self.pixbuf = gtk.gdk.pixbuf_new_from_array(self.imageBlack, gtk.gdk.COLORSPACE_RGB, 8)
+			self.pixbuf = _pixbuf_from_array(self.imageBlack)
 		# Set pixbuf.
 		self.imageView.set_from_pixbuf(self.pixbuf)
 #		print "4: Finished image update at " + str(time.time()) + "."

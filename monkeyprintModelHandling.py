@@ -29,10 +29,12 @@ import numpy
 import time
 import random
 from PIL import Image#, ImageTk
-import Queue, threading
+import queue, threading
 import monkeyprintImageHandling as imageHandling
-import gtk
-import cPickle	# Save modelCollection to file.
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, GLib
+import pickle	# Save modelCollection to file.
 import gzip
 import tarfile
 import copy
@@ -396,9 +398,9 @@ class modelCollection(dict):
 		#self.stackHeightOld = self.sliceStackPreview.getStackHeight()
 		# Queue for transferring slice images from model slicer threads
 		# to slice combiner thread.
-		self.queueModelCollectionToCombiner = Queue.Queue()
-		self.queueCombinerToModelCollection = Queue.Queue()
-		self.queueCombinerToModelCollectionSingle = Queue.Queue()
+		self.queueModelCollectionToCombiner = queue.Queue()
+		self.queueCombinerToModelCollection = queue.Queue()
+		self.queueCombinerToModelCollectionSingle = queue.Queue()
 		# Slice combiner thread.
 		self.threadSliceCombiner = sliceCombiner(self.programSettings, self.queueModelCollectionToCombiner, self.queueCombinerToModelCollection, self.queueCombinerToModelCollectionSingle, self.console)
 		self.threadSliceCombiner.start()
@@ -415,7 +417,7 @@ class modelCollection(dict):
 		# Create model list.***********************************
 		# List will contain strings for dispayed name,
 		# internal name and file name and a bool for active state.
-		self.modelList = gtk.ListStore(str, str, str, bool)
+		self.modelList = Gtk.ListStore(str, str, str, bool)
 
 		# Create job settings object. *************************
 		#self.jobSettings = monkeyprintSettings.jobSettings(self.programSettings)
@@ -425,7 +427,7 @@ class modelCollection(dict):
 	def subtractCalibrationImage(self, inputImage):
 		# Get the image if it does not exist.
 		if self.calibrationImage == None and self.programSettings['calibrationImage'].value:
-			print "Loading calibration image."
+			print("Loading calibration image.")
 			calibrationImage = None
 			try:
 				if os.path.isfile('./calibrationImage.png'):
@@ -433,7 +435,7 @@ class modelCollection(dict):
 				elif os.path.isfile('./calibrationImage.jpg'):
 					calibrationImage = cv2.imread('./calibrationImage.jpg')
 			except Error:
-				print "Could not load calibration image. Skipping..."
+				print("Could not load calibration image. Skipping...")
 
 			# If loading succeded...
 			if calibrationImage != None:
@@ -478,7 +480,7 @@ class modelCollection(dict):
 			if model != "default":
 				modelSettings[model] = (self[model].settings)
 		# Model list for GUI.
-		# gtk.ListStores cannot be pickled, so we convert to list of lists.
+		# Gtk.ListStores cannot be pickled, so we convert to list of lists.
 		listStoreList = []
 		for row in range(len(self.modelList)):
 			i = self.modelList.get_iter(row)
@@ -494,7 +496,7 @@ class modelCollection(dict):
 		picklePath = os.getcwd() + '/pickle.bin'
 		with open(picklePath, 'wb') as pickleFile:
 			# Dump the data.
-			cPickle.dump(data, pickleFile, protocol)
+			pickle.dump(data, pickleFile, protocol)
 
 
 		# Add all relevant stl files.
@@ -521,8 +523,8 @@ class modelCollection(dict):
 				#print path.split('/')[-1]
 				try:
 					mkpFile.add(path, arcname=path.split('/')[-1])
-				except IOError, OSError:
-					print "Stl file not found..."
+				except IOError as OSError:
+					print("Stl file not found...")
 # TODO: Handle file not found error in GUI.
 # TODO: Maybe copy stls into temporary dir upon load?
 # This would be consistent with loading an mkp file and saving stls to tmp dir.
@@ -541,7 +543,7 @@ class modelCollection(dict):
 		data=None
 		with open(tmpPath+'/pickle.bin', 'rb') as pickleFile:
 			# Dump the data.
-			data = cPickle.load(pickleFile)
+			data = pickle.load(pickleFile)
 
 		# Clear all models from current model collection.
 		self.removeAll()
@@ -656,7 +658,7 @@ class modelCollection(dict):
 	# Return the current preview stack height.
 	# This might be 1 if slicer is still running.
 	def getPreviewStackHeightCurrent(self):
-		print len(self.sliceStackPreview)
+		print(len(self.sliceStackPreview))
 		return len(self.sliceStackPreview)
 
 
@@ -727,8 +729,8 @@ class modelCollection(dict):
 			# Update progress bar.
 			if updateFunction != None:
 				updateFunction(int(status))
-				while gtk.events_pending():
-					gtk.main_iteration(False)
+				while Gtk.events_pending():
+					Gtk.main_iteration(False)
 			if int(status) == 100:
 				break
 		# Reset slice mode to preview.
@@ -1300,8 +1302,8 @@ class modelData:
 		########################################################################
 		# Background thread for updating the slices on demand. #################
 		########################################################################
-		self.queueSlicerIn = Queue.Queue()
-		self.queueSlicerOut = Queue.Queue()
+		self.queueSlicerIn = queue.Queue()
+		self.queueSlicerOut = queue.Queue()
 		if self.filename != "":
 			# Initialise the thread.
 			if self.console!=None:
@@ -1417,31 +1419,31 @@ class modelData:
 			if vtk.VTK_MAJOR_VERSION <= 5:
 				self.volumeModel.SetInput(self.stlPositionFilter.GetOutput())
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Warning: " + self.errorObserver.ErrorMessage()
+					print("VTK Warning: " + self.errorObserver.ErrorMessage())
 			else:
 				self.volumeModel.SetInputConnection(self.stlPositionFilter.GetOutputPort())
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Warning: " + self.errorObserver.ErrorMessage()
+					print("VTK Warning: " + self.errorObserver.ErrorMessage())
 			self.volumeSupports = vtk.vtkMassProperties()
 			self.volumeSupports.AddObserver('WarningEvent', self.errorObserver)
 			if vtk.VTK_MAJOR_VERSION <= 5:
 				self.volumeSupports.SetInput(self.supports.GetOutput())
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Warning: " + self.errorObserver.ErrorMessage()
+					print("VTK Warning: " + self.errorObserver.ErrorMessage())
 			else:
 				self.volumeSupports.SetInputConnection(self.supports.GetOutputPort())
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Warning: " + self.errorObserver.ErrorMessage()
+					print("VTK Warning: " + self.errorObserver.ErrorMessage())
 			self.volumeBottomPlate = vtk.vtkMassProperties()
 			self.volumeBottomPlate.AddObserver('WarningEvent', self.errorObserver)
 			if vtk.VTK_MAJOR_VERSION <= 5:
 				self.volumeBottomPlate.SetInput(self.bottomPlate.GetOutput())
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Warning: " + self.errorObserver.ErrorMessage()
+					print("VTK Warning: " + self.errorObserver.ErrorMessage())
 			else:
 				self.volumeBottomPlate.SetInputConnection(self.bottomPlate.GetOutputPort())
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Warning: " + self.errorObserver.ErrorMessage()
+					print("VTK Warning: " + self.errorObserver.ErrorMessage())
 
 
 		# Finally, update the pipeline.
@@ -1495,7 +1497,7 @@ class modelData:
 
 			self.volumeModel.Update()
 			if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-				print "VTK Warning: " + self.errorObserver.ErrorMessage()
+				print("VTK Warning: " + self.errorObserver.ErrorMessage())
 			# TODO: mass properties throws some errors here, possibly because the support polydata contains non-triangles.
 			# THis can only be the cylinders.
 			# Maybe triangulate them first somehow...
@@ -1503,23 +1505,23 @@ class modelData:
 			if self.supports.GetNumberOfInputConnections(0) > 0:
 				self.volumeSupports.Update()
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.WarningOccurred():
-					print "VTK Warning: " + self.errorObserver.WarningMessage()
+					print("VTK Warning: " + self.errorObserver.WarningMessage())
 #				elif self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
 #					print "VTK Error: " + self.errorObserver.ErrorMessage()
 			self.volumeBottomPlate.Update()
 			if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-				print "VTK Error: " + self.errorObserver.ErrorMessage()
+				print("VTK Error: " + self.errorObserver.ErrorMessage())
 
 			# Get volume in mm³.
 			if self.supports.GetNumberOfInputConnections(0) > 0:
 
 				volume = self.volumeModel.GetVolume() + self.volumeSupports.GetVolume() + self.volumeBottomPlate.GetVolume()
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Error: " + self.errorObserver.ErrorMessage()
+					print("VTK Error: " + self.errorObserver.ErrorMessage())
 			else:
 				volume = self.volumeModel.GetVolume() + self.volumeBottomPlate.GetVolume()
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Error: " + self.errorObserver.ErrorMessage()
+					print("VTK Error: " + self.errorObserver.ErrorMessage())
 			# Convert to cm³ and round to 2 decimals.
 			volume = math.trunc(volume / 10.) /100.
 			return volume
@@ -1725,7 +1727,7 @@ class modelData:
 				self.locator.BuildLocator()
 				self.locator.Update()
 				if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-					print "VTK Error: " + self.errorObserver.ErrorMessage()
+					print("VTK Error: " + self.errorObserver.ErrorMessage())
 
 				# Get overhang bounds to set up support pattern.
 				# Bounds are absolute coordinates.
@@ -1776,7 +1778,7 @@ class modelData:
 						# Intersect.
 						self.locator.IntersectWithLine(pointBottom, pointTop, tolerance, t, pos, pcoords, subId)
 						if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-							print "VTK Error: " + self.errorObserver.ErrorMessage()
+							print("VTK Error: " + self.errorObserver.ErrorMessage())
 
 						# Create cone if intersection point found.
 						if pos != [0,0,0]:
@@ -1850,24 +1852,24 @@ class modelData:
 							if vtk.VTK_MAJOR_VERSION <= 5:
 								self.supports.AddInput(coneGeomFilter.GetOutput())
 								if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-									print "VTK Error: " + self.errorObserver.ErrorMessage()
+									print("VTK Error: " + self.errorObserver.ErrorMessage())
 							else:
 								support_inputs += 2
 								self.supports.SetNumberOfInputs(support_inputs)
 								self.supports.SetInputConnectionByNumber(support_inputs - 2, coneGeomFilter.GetOutputPort())
 								if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-									print "VTK Error: " + self.errorObserver.ErrorMessage()
+									print("VTK Error: " + self.errorObserver.ErrorMessage())
 							# Delete the cone. Vtk delete() method does not work in python because of garbage collection.
 							del cone
 							# Append the cylinder to the cones polydata.
 							if vtk.VTK_MAJOR_VERSION <= 5:
 								self.supports.AddInput(cylinderGeomFilter.GetOutput())
 								if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-									print "VTK Error: " + self.errorObserver.ErrorMessage()
+									print("VTK Error: " + self.errorObserver.ErrorMessage())
 							else:
 								self.supports.SetInputConnectionByNumber(support_inputs - 1, cylinderGeomFilter.GetOutputPort())
 								if self.programSettings['showVtkErrors'].value and self.errorObserver.ErrorOccurred():
-									print "VTK Error: " + self.errorObserver.ErrorMessage()
+									print("VTK Error: " + self.errorObserver.ErrorMessage())
 							del cylinder
 			#				i += 1
 			#	print "Created " + str(i) + " supports."
@@ -2553,7 +2555,7 @@ class sliceCombiner(threading.Thread):
 			sliceNumbers += [int(round((previewSlice)*sliceMultiplier)) for previewSlice in range(1, numberOfPreviewSlices-1)]
 			sliceNumbers += [stackHeight-1]
 		elif mode == "full":
-			sliceNumbers = range(stackHeight)
+			sliceNumbers = list(range(stackHeight))
 		elif mode == "single":#type(eval(mode)) == int or type(eval(mode)) == float:
 			sliceNumbers = [int(modelNamesAndHeights[6].split(' ')[1])]
 
@@ -2652,7 +2654,7 @@ class sliceCombiner(threading.Thread):
 		if self.newInputInQueue():
 			return None
 		else:
-			print "Slicer run time: " + str(time.time() - interval) + " s."
+			print("Slicer run time: " + str(time.time() - interval) + " s.")
 			if mode == "preview":
 				return [sliceStackPreview, sliceNumbers]
 
@@ -2827,7 +2829,7 @@ class backgroundSlicer(threading.Thread):
 				# ...do the slicing.
 				warningSlices = self.updateSlices(slicerInputInfo)
 				if self.debug:
-					print "Slicer done."
+					print("Slicer done.")
 			# If new input has arrivied...
 			else:
 				# Break the loop, return to idle mode and restart from there.
@@ -2927,7 +2929,7 @@ class backgroundSlicer(threading.Thread):
 						imageSlice, imageSliceCorrupted = self.createSliceImage(sliceNumber, model=True)
 						# Handle corrupted polylines.
 						if imageSliceCorrupted is not None:
-							print "Slice " + str(sliceNumber) + ": Warning: there are open polyline segments. Please check if your model is watertight."
+							print("Slice " + str(sliceNumber) + ": Warning: there are open polyline segments. Please check if your model is watertight.")
 							warningSlices.append(sliceNumber)
 							# TODO: display this in GUI.
 						# Append image to slice stack buffer.
@@ -2946,7 +2948,7 @@ class backgroundSlicer(threading.Thread):
 					if sliceNumber >= self.wallThicknessLayers:
 						currentSlice = sliceStackBuffer.getCenter()
 						if self.debug:
-							print "Generating slice " + str(sliceNumber-self.wallThicknessLayers) + "."
+							print("Generating slice " + str(sliceNumber-self.wallThicknessLayers) + ".")
 						if self.printHollow:
 							if sliceStackBuffer.getBelowCenter()[0] is not None and sliceStackBuffer.getAboveCenter()[-1] is not None:
 								currentSlice = self.hollowSliceImage(currentSlice, imageSliceEroded, sliceStackBuffer.getBelowCenter(), sliceStackBuffer.getAboveCenter(), sliceStackBufferEroded.getBelowCenter(), sliceStackBufferEroded.getAboveCenter())
@@ -2961,7 +2963,7 @@ class backgroundSlicer(threading.Thread):
 						self.writeSliceToDisk(currentSlice, sliceNumber-self.wallThicknessLayers)
 					else:
 						if self.debug:
-							print "Filling slice buffer."
+							print("Filling slice buffer.")
 				# Break if new input is in slice stack queue.
 				else:
 					if self.console:
@@ -3124,29 +3126,29 @@ class backgroundSlicer(threading.Thread):
 		if model:
 			self.cuttingFilterModel.Update()
 			if self.showVtkErrors and self.errorObserver.ErrorOccurred():
-				print "VTK Error: " + self.errorObserver.ErrorMessage()
+				print("VTK Error: " + self.errorObserver.ErrorMessage())
 		if supports:
 			self.cuttingFilterSupports.Update()
 			if self.showVtkErrors and self.errorObserver.ErrorOccurred():
-				print "VTK Error: " + self.errorObserver.ErrorMessage()
+				print("VTK Error: " + self.errorObserver.ErrorMessage())
 		if bottomPlate:
 			self.cuttingFilterBottomPlate.Update()
 			if self.showVtkErrors and self.errorObserver.ErrorOccurred():
-				print "VTK Error: " + self.errorObserver.ErrorMessage()
+				print("VTK Error: " + self.errorObserver.ErrorMessage())
 
 		# Update section strippers.
 		if model:
 			self.sectionStripperModel.Update()
 			if self.showVtkErrors and self.errorObserver.ErrorOccurred():
-				print "VTK Error: " + self.errorObserver.ErrorMessage()
+				print("VTK Error: " + self.errorObserver.ErrorMessage())
 		if supports:
 			self.sectionStripperSupports.Update()
 			if self.showVtkErrors and self.errorObserver.ErrorOccurred():
-				print "VTK Error: " + self.errorObserver.ErrorMessage()
+				print("VTK Error: " + self.errorObserver.ErrorMessage())
 		if bottomPlate:
 			self.sectionStripperBottomPlate.Update()
 			if self.showVtkErrors and self.errorObserver.ErrorOccurred():
-				print "VTK Error: " + self.errorObserver.ErrorMessage()
+				print("VTK Error: " + self.errorObserver.ErrorMessage())
 
 		# Turn VTK polylines into numpy point arrays.
 		# Start timer.
@@ -3367,7 +3369,7 @@ class backgroundSlicer(threading.Thread):
 		# End timer.
 		if self.debug:
 			interval = time.time() - interval
-			print "Polyline point sort time: " + str(interval) + " s."
+			print("Polyline point sort time: " + str(interval) + " s.")
 
 		# Return polylines.
 		return (polylinesClosedAll, polylinesCorruptedAll)
